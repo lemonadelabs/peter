@@ -1,0 +1,23 @@
+{
+  "name": "Peter",
+  "version": "0.0.1",
+  "homepage": "",
+  "authors": [
+    "caleb.sawtell@lemonadelabs.io"
+  ],
+  "description": "Lemonade Labs Lightweight Login Screen",
+  "license": "Copywrite Lemonade Labs 2015",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "~2.1.4"
+  },
+  "devDependencies": {
+    "blueimp-md5": "blueimp/JavaScript-MD5#~1.1.1"
+  }
+}
