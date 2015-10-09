@@ -17,3 +17,5 @@ dist/
 css/
 *.min.*
 *.html
+
+app/index.html

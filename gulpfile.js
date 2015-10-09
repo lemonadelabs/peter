@@ -1,6 +1,6 @@
 //Required
 var gulp = require('gulp'),
-    config = require('./config.json'),
+    config = require('./app/config.json'),
     mustache = require("gulp-mustache-plus"),
     browserSync = require('browser-sync'),
     reload = browserSync.reload,
@@ -38,7 +38,6 @@ gulp.task('styles', function(){
 //HTML Task
 
 gulp.task('mustache', function(){
-  console.log(config.product);
   gulp.src('app/templates/**/*.mustache')
   .pipe(plumber())
   .pipe(mustache(config))

@@ -4,12 +4,19 @@
     <meta charset="utf-8">
     <title>Login</title>
     <link rel="stylesheet" type="text/css" href="css/app.css">
+    {{#customCSS}}
+      <link rel="stylesheet" type="text/css" href="{{cssPath}}">
+    {{/customCSS}}
     <script type="text/javascript" src="bower_components/jquery/dist/jquery.min.js"></script>
     <script type="text/javascript" src="bower_components/blueimp-md5/js/md5.min.js"></script>
+    <script type="text/json" src="config.json"></script>
     <script type="text/javascript" src="js/main.min.js"></script>
   </head>
   <body>
     <main class="login-main">
+      {{#showLogo}}
+        <img src="{{logoPath}}" alt="{{product}}" class="login-logo">
+      {{/showLogo}}
       <div class="login-form">
         <p class="login-message">Please login to {{product}}</p>
         <input type="text" name="username" value="" placeholder="Username">
