@@ -67,10 +67,10 @@ gulp.task('build:serve', function(){
 gulp.task('watch',function (){
   gulp.watch('app/js/**/*.js',['scripts']);
   gulp.watch('app/scss/**/*.scss',['styles']);
-  gulp.watch('app/**/*.mustache',['mustache']);
+  gulp.watch('app/templates/**/*.mustache',['mustache']);
 });
 
-//Build Task
+//Build Tasks
 
 gulp.task('build:clean', function(cb){
   del([
@@ -86,6 +86,7 @@ gulp.task('build:copy', function(){
 gulp.task('build:tidy', ['build:copy'], function(cb){
   del([
     'build/scss/',
+    //'build/templates/',
     'build/js/!(*.min.js)',
     'build/bower_components/**/src/',
     'build/bower_components/**/dist/!(*.min.js)',
@@ -93,6 +94,6 @@ gulp.task('build:tidy', ['build:copy'], function(cb){
   ], cb);
 });
 
-gulp.task('build',['build:copy','build:tidy']);
+gulp.task('build',['scripts','styles','mustache','build:copy','build:tidy']);
 //Default Task
 gulp.task('default', ['scripts','styles','mustache','browser-sync','watch']);
