@@ -120,6 +120,39 @@ def logout_app_view(request):
         return HTTPNotFound(request=request)
 
 
+def login_redir(request):
+    """
+    :rtype: pyramid.Respone
+
+    activated only when no view permissions granted
+
+    provide non-asset or image requests, redirects to ``/login`` if no valid
+    session context established. (to be fixed!)
+    """
+
+    if request.path.startswith("/login") or request.path.startswith("/logout"):
+        indexPath = os.path.join(static_assets_login, "index.html")
+        if os.path.isfile(indexPath):
+            return FileResponse(indexPath,
+                                request=request)
+        else:
+            return HTTPNotFound(request=request)
+
+    pathRequested = os.path.join(static_assets_login, request.path.lstrip("/"))
+
+    # secure against path traversal with .. or similar
+    if pathRequested.startswith(static_assets_login):
+        if os.path.isfile(pathRequested):
+            return FileResponse(pathRequested,
+                                request=request)
+        else:
+            # might not be there
+            return HTTPFound(request=request, location="/login")
+    else:
+        # invalid path
+        return HTTPNotFound(request=request, location="/login")
+
+
 def app_view(request):
     """
     :rtype: pyramid.Respone
@@ -194,7 +227,7 @@ def includeme(config):
 
     authn_policy = AuthTktAuthenticationPolicy(hashSecret,
                                                hashalg='sha512',
-                                               # callback=groupfinder,
+                                               callback=groupfinder,
                                                timeout=timeout,
                                                reissue_time=reissue_timeout)
     authz_policy = ACLAuthorizationPolicy()
@@ -215,6 +248,7 @@ def includeme(config):
                     permission=NO_PERMISSION_REQUIRED)
 
     config.add_route('logout', '/api/logout',
+                     # maybe needs a minimal permission?
                      permission=NO_PERMISSION_REQUIRED)
     config.add_view(logoutView,
                     route_name="logout",
@@ -232,10 +266,28 @@ def includeme(config):
     config.add_view(login_app_view,
                     route_name="loginApp")
 
-    config.add_route('simone_app', '*subpath')
+    # that serves the application
+    config.add_route('simone_app',
+                     '*subpath',
+                     permission="view")
     config.add_view(app_view,
                     route_name='simone_app')
 
-    config.add_route('simone_app2', '/')
+    config.add_route('simone_app2',
+                     '/',
+                     permission="view")
     config.add_view(app_view,
                     route_name='simone_app2')
+
+    # add login redirect
+    config.add_route('simone_app_nologin',
+                     '*subpath',
+                     permission=NO_PERMISSION_REQUIRED)
+    config.add_view(login_redir,
+                    route_name='simone_app_nologin')
+
+    config.add_route('simone_app2_nologin',
+                     '/',
+                     permission=NO_PERMISSION_REQUIRED)
+    config.add_view(login_redir,
+                    route_name='simone_app2_nologin')
