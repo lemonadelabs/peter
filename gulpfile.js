@@ -1,5 +1,7 @@
 //Required
 var gulp = require('gulp'),
+    config = require('./config.json'),
+    mustache = require("gulp-mustache-plus"),
     browserSync = require('browser-sync'),
     reload = browserSync.reload,
     del = require('del'),
@@ -35,12 +37,12 @@ gulp.task('styles', function(){
 
 //HTML Task
 
-gulp.task('html', function(){
-  gulp.src('app/html/pages/**/*.html')
+gulp.task('mustache', function(){
+  console.log(config.product);
+  gulp.src('app/templates/**/*.mustache')
   .pipe(plumber())
-  .pipe(htmlInclude())
-  //TODO: use gulp-if for to handle index.html http://stackoverflow.com/questions/27181719/gulp-condition-inside-pipe
-  .pipe(gulp.dest('app/pages'))
+  .pipe(mustache(config))
+  .pipe(gulp.dest('app/'))
   .pipe(reload({stream:true}));
 });
 
@@ -66,7 +68,7 @@ gulp.task('build:serve', function(){
 gulp.task('watch',function (){
   gulp.watch('app/js/**/*.js',['scripts']);
   gulp.watch('app/scss/**/*.scss',['styles']);
-  gulp.watch('app/**/*.html',['html']);
+  gulp.watch('app/**/*.mustache',['mustache']);
 });
 
 //Build Task
@@ -85,10 +87,13 @@ gulp.task('build:copy', function(){
 gulp.task('build:tidy', ['build:copy'], function(cb){
   del([
     'build/scss/',
-    'build/js/!(*.min.js)'
+    'build/js/!(*.min.js)',
+    'build/bower_components/**/src/',
+    'build/bower_components/**/dist/!(*.min.js)',
+    'build/bower_components/**/js/!(*.min.js)'
   ], cb);
 });
 
 gulp.task('build',['build:copy','build:tidy']);
 //Default Task
-gulp.task('default', ['scripts','styles','html','browser-sync','watch']);
+gulp.task('default', ['scripts','styles','mustache','browser-sync','watch']);
