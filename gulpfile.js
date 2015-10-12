@@ -2,6 +2,8 @@
 var gulp = require('gulp'),
     config = require('./app/config.json'),
     mustache = require("gulp-mustache-plus"),
+    url = require('url'),
+    proxy = require('proxy-middleware'),
     browserSync = require('browser-sync'),
     reload = browserSync.reload,
     del = require('del'),
@@ -48,9 +50,13 @@ gulp.task('mustache', function(){
 //Browser-Sync Task
 
 gulp.task('browser-sync', function(){
+  var proxyOptions = url.parse('http://localhost:5555/api');
+  proxyOptions.route = '/api';
+
   browserSync({
     server:{
-      baseDir: "./app/"
+      baseDir: "./app/",
+      middleware: [proxy(proxyOptions)]
     }
   });
 });

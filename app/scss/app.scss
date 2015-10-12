@@ -15,7 +15,7 @@ html {
   width: 960px;
 }
 
-.login-form {
+.login-box {
   position: absolute;
   top: 50%;
   left: 50%;
@@ -24,6 +24,11 @@ html {
   margin-top: -75px;
   margin-left: -100px;
 
+  p {
+    font-size: 10.5pt;
+    white-space: nowrap;
+  }
+
   input[type="text"],
   input[type="password"] {
     height: 2.5em;
@@ -31,4 +36,15 @@ html {
     padding-left: .7em;
     width: 100%;
   }
+}
+.denied{
+  animation-name: not-alowed;
+  animation-duration: 1s;
+  animation-timing-function: ease-in-out;
+}
+@keyframes not-alowed {
+    0% {transform: translateX(0px);}
+    30% {transform: translateX(-40px);}
+    60% {transform: translateX(40px);}
+    100% {transform: translateX(0px);}
 }

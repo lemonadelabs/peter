@@ -4,5 +4,5 @@
   "cssPath" : "css/custom.css",
   "showLogo" : true,
   "logoPath" : "images/logo.svg",
-  "successURL" : "/"
+  "successURL" : "/loggedin.html"
 }
