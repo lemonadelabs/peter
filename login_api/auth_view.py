@@ -10,8 +10,8 @@ import base64
 import random
 import hashlib
 import os.path
+import logging
 
-from pyramid.security import NO_PERMISSION_REQUIRED, remember, forget
 from pyramid.httpexceptions import (HTTPBadRequest, HTTPForbidden,
                                     HTTPFound, HTTPNotFound)
 
@@ -20,7 +20,11 @@ from pyramid.response import Response, FileResponse
 # create authentication/authorization framework
 from pyramid.authentication import AuthTktAuthenticationPolicy
 from pyramid.authorization import ACLAuthorizationPolicy
-from pyramid.security import Allow, Authenticated
+from pyramid.security import (NO_PERMISSION_REQUIRED,
+                              remember, forget,
+                              Allow, Deny,
+                              Authenticated, Everyone,
+                              Allowed, Denied)
 
 here = os.path.dirname(os.path.abspath(__file__))
 repository_root = os.path.dirname(here)  # should be one level further down
@@ -41,19 +45,20 @@ class RootFactory:
     """
     future use: more fine-grained access
     """
-    __acl__ = [(Allow, Authenticated, 'view')]
+    __acl__ = [(Allow, Authenticated, 'view'),
+               ]
 
     def __init__(self, request):
         pass
 
 
-def loginView(request):
+def loginAPIView(request):
     """
     :param pyramid.Request request: request POST with ``username`` and
          ``password`` as md5 hash
     :rtype: pyramid.Response
     :returns: response with session cookie in header or Forbidden for
-         unrecognizde credentials
+         unrecognized credentials
 
     Use this view with a ``POST`` request to send ``username`` and
     ``passowrd``. A session is generated and added to the response header.
@@ -90,7 +95,7 @@ def loginView(request):
     return response
 
 
-def logoutView(request):
+def logoutAPIView(request):
     """
     invalidates the session when ``/api/logout`` is called.
     """
@@ -100,57 +105,66 @@ def logoutView(request):
     return response
 
 
-def login_app_view(request):
-    # this might soon be no longer the same as logout_app_view
+def loginPageView(request):
+    """
+    login.html might need resources from this site, these should be served
+    instead of being redirected as well. What are these resources?
+    this is configurable in config.json and is a list of paths in
+    build/config.json .
+
+    These paths are relative to the location of the index.html file
+    customCSS and logoPath if the customCSS and showLogo are True respectively.
+
+    .. code-block:: json
+
+    {
+      "product":"Example Product",
+      "customCSS" : false,
+      "cssPath" : "css/custom.css",
+      "showLogo" : true,
+      "logoPath" : "images/logo.svg",
+      "successURL" : "/"
+    }
+    """
+    logging.debug("loginPageView view")
+
+    if request.has_permission("view") is Allowed:
+        return HTTPFound("/")  # success url
+
     indexPath = os.path.join(static_assets_login, "index.html")
     if os.path.isfile(indexPath):
         return FileResponse(indexPath,
+                            content_type="text/html",
                             request=request)
     else:
         return HTTPNotFound(request=request)
 
 
-def logout_app_view(request):
-    # this might soon be no longer the same as login_app_view
-    indexPath = os.path.join(static_assets_login, "index.html")
-    if os.path.isfile(indexPath):
-        return FileResponse(indexPath,
-                            request=request)
-    else:
-        return HTTPNotFound(request=request)
-
-
-def login_redir(request):
-    """
-    :rtype: pyramid.Respone
-
-    activated only when no view permissions granted
-
-    provide non-asset or image requests, redirects to ``/login`` if no valid
-    session context established. (to be fixed!)
-    """
-
-    if request.path.startswith("/login") or request.path.startswith("/logout"):
-        indexPath = os.path.join(static_assets_login, "index.html")
-        if os.path.isfile(indexPath):
-            return FileResponse(indexPath,
+def loginPageResources(request):
+    logging.debug("loginPageResources view")
+    if request.path == "/css/custom.css":
+        cssPath = os.path.join(static_assets_login, "css/custom.css")
+        if os.path.isfile(cssPath):
+            return FileResponse(cssPath,
                                 request=request)
         else:
             return HTTPNotFound(request=request)
-
-    pathRequested = os.path.join(static_assets_login, request.path.lstrip("/"))
-
-    # secure against path traversal with .. or similar
-    if pathRequested.startswith(static_assets_login):
-        if os.path.isfile(pathRequested):
-            return FileResponse(pathRequested,
+    elif request.path == "/images/logo.svg":
+        logoPath = os.path.join(static_assets_login, "images/logo.svg")
+        if os.path.isfile(logoPath):
+            return FileResponse(logoPath,
                                 request=request)
         else:
-            # might not be there
-            return HTTPFound(request=request, location="/login")
+            return HTTPNotFound(request=request)
+    elif request.path == "/config.json":
+        configPath = os.path.join(static_assets_login, "config.json")
+        if os.path.isfile(configPath):
+            return FileResponse(configPath,
+                                request=request)
+        else:
+            return HTTPNotFound(request=request)
     else:
-        # invalid path
-        return HTTPNotFound(request=request, location="/login")
+        return HTTPForbidden(request=request)
 
 
 def app_view(request):
@@ -160,24 +174,18 @@ def app_view(request):
     provide non-asset or image requests, redirects to ``/login`` if no valid
     session context established. (to be fixed!)
     """
+    logging.debug("app_view view")
 
-    if request.path.startswith("/login") or request.path.startswith("/logout"):
-        indexPath = os.path.join(static_assets_login, "index.html")
-        if os.path.isfile(indexPath):
-            return FileResponse(indexPath,
-                                request=request)
-        else:
-            return HTTPNotFound(request=request)
+    if request.has_permission("view") is not Allowed:
+        return HTTPFound(request=request, location="/login.html")
 
     # assume this is the path for the application
     if request.path == "/" or request.path == "/index.html":
-        # decide whether authenticated or not except for /login
-        if not request.has_permission('view') and request.path != "/login":
-            return HTTPFound(location="/login", request=request)
 
         indexPath = os.path.join(static_assets_login, "index.html")
         if os.path.isfile(indexPath):
             return FileResponse(indexPath,
+                                content_type="text/html",
                                 request=request)
         else:
             return HTTPNotFound(request=request)
@@ -235,59 +243,48 @@ def includeme(config):
     config.set_root_factory(RootFactory)
     config.set_authentication_policy(authn_policy)
     config.set_authorization_policy(authz_policy)
-    config.add_route('login', '/api/login',
-                     permission=NO_PERMISSION_REQUIRED)
-    config.add_view(loginView,
+
+    # these are the API functions, serve them always
+    config.add_route('login',
+                     '/api/login')
+    config.add_view(loginAPIView,
                     route_name="login",
                     permission=NO_PERMISSION_REQUIRED)
-
-    config.add_route('login_w_redir', '/api/login/*subpath',
-                     permission=NO_PERMISSION_REQUIRED)
-    config.add_view(loginView,
+    config.add_route("login_w_redir",
+                     '/api/login/*subpath',)
+    config.add_view(loginAPIView,
                     route_name="login_w_redir",
                     permission=NO_PERMISSION_REQUIRED)
-
-    config.add_route('logout', '/api/logout',
-                     # maybe needs a minimal permission?
-                     permission=NO_PERMISSION_REQUIRED)
-    config.add_view(logoutView,
+    config.add_route('logout',
+                     '/api/logout')
+    config.add_view(logoutAPIView,
                     route_name="logout",
                     permission=NO_PERMISSION_REQUIRED)
 
-    # login screen route and logout screen route:
-    config.add_route('logoutApp', '/logout',
-                     # maybe needs a minimal permission?
-                     permission=NO_PERMISSION_REQUIRED)
-    config.add_view(logout_app_view,
-                    route_name="logoutApp")
+    # this serves the login screen
+    config.add_route("loginPage",
+                     "/login.html")
+    config.add_view(loginPageView,
+                    route_name='loginPage')
+    config.add_route("loginPageCSS",
+                     "/css/custom.css")
+    config.add_view(loginPageResources,
+                    route_name='loginPageCSS')
+    config.add_route("loginPageLogo",
+                     "/images/logo.svg")
+    config.add_view(loginPageResources,
+                    route_name='loginPageLogo')
+    config.add_route("loginPageConfig",
+                     "/config.json")
+    config.add_view(loginPageResources,
+                    route_name='loginPageConfig')
 
-    config.add_route('loginApp', '/login',
-                     permission=NO_PERMISSION_REQUIRED)
-    config.add_view(login_app_view,
-                    route_name="loginApp")
-
-    # that serves the application
+    # that serves the application if permissions granted!
     config.add_route('simone_app',
-                     '*subpath',
-                     permission="view")
+                     '*subpath')
     config.add_view(app_view,
                     route_name='simone_app')
-
     config.add_route('simone_app2',
-                     '/',
-                     permission="view")
+                     '/')
     config.add_view(app_view,
                     route_name='simone_app2')
-
-    # add login redirect
-    config.add_route('simone_app_nologin',
-                     '*subpath',
-                     permission=NO_PERMISSION_REQUIRED)
-    config.add_view(login_redir,
-                    route_name='simone_app_nologin')
-
-    config.add_route('simone_app2_nologin',
-                     '/',
-                     permission=NO_PERMISSION_REQUIRED)
-    config.add_view(login_redir,
-                    route_name='simone_app2_nologin')

@@ -33,9 +33,9 @@ function login(){
   .done(function(data, status){
     //move the browser location to the new url
     console.log(currentURL);
-    /*if(currentURL.hash!==undefined){
+    if(currentURL.hash!==undefined){
       document.location.assign(currentURL.origin+config.successURL);
-    }*/
+    }
   })
   .fail(function(data){
     if(data.status === 403){
