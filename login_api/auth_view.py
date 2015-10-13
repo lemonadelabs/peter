@@ -25,7 +25,7 @@ import logging
 import json
 
 from pyramid.httpexceptions import (HTTPBadRequest, HTTPForbidden,
-                                    HTTPFound, HTTPNotFound)
+                                    HTTPFound)
 
 from pyramid.response import Response, FileResponse
 from pyramid.static import static_view
@@ -38,6 +38,7 @@ from pyramid.security import (NO_PERMISSION_REQUIRED,
                               Allow, Deny,
                               Authenticated, Everyone,
                               Allowed, Denied)
+from pyramid.encode import urlencode
 
 here = os.path.dirname(os.path.abspath(__file__))
 repository_root = os.path.dirname(here)  # should be one level further down
@@ -77,7 +78,11 @@ class RootFactory:
 
 
 def loginPageRedirect(request):
-    return HTTPFound("/login/")
+
+    # append direct information
+
+    return HTTPFound("/login/?%s" % urlencode({"redir": request.path}),
+                     request=request)
 
 
 def loginAPIView(request):
@@ -135,7 +140,6 @@ def logoutAPIView(request):
 
 def loginPageView(request):
     # todo: assure this file is there
-
     return FileResponse(os.path.join(static_assets_login, "login.html"),
                         request=request)
 
@@ -144,8 +148,7 @@ class projectView(static_view):
 
     def __call__(self, context, request):
         if not request.has_permission("view"):
-            return HTTPFound("/login/",
-                             request=request)
+            return loginPageRedirect(request)
 
         return static_view.__call__(self, context, request)
 
@@ -209,21 +212,27 @@ def includeme(config):
     # a special exception for Caleb's test:
     # loggedin.html only being served when logged in
     def loggedInView(request):
-        if not request.has_permission('read'):
+        if not request.has_permission('view'):
             return loginPageRedirect(request)
         else:
-            FileResponse(static_assets_login, "loggedin.html")
+            return FileResponse(os.path.join(static_assets_login,
+                                             "loggedin.html"))
+
     config.add_route("login.loggedin",
                      "/loggedin.html")
-    config.add_view(loginPageRedirect,
+    config.add_view(loggedInView,
                     route_name='login.loggedin')
 
-    # this serves the login screen
+    def convenienceLoginForward(request):
+        return HTTPFound("/login/")
+
+    # this is a convenience forward
     config.add_route("loginPageRedir",
                      "/login")
-    config.add_view(loginPageRedirect,
+    config.add_view(convenienceLoginForward,
                     route_name='loginPageRedir')
 
+    # this serves the login screen
     config.add_route("loginPage",
                      "/login/*subpath")
     config.add_view(static_view(static_assets_login,
