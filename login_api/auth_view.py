@@ -81,7 +81,7 @@ def loginPageRedirect(request):
 
     # append direct information
 
-    return HTTPFound("/login/?%s" % urlencode({"redir": request.path}),
+    return HTTPFound("/login/login.html?%s" % urlencode({"redir": request.path}),
                      request=request)
 
 
@@ -224,7 +224,7 @@ def includeme(config):
                     route_name='login.loggedin')
 
     def convenienceLoginForward(request):
-        return HTTPFound("/login/")
+        return HTTPFound("/login/login.html")
 
     # this is a convenience forward
     config.add_route("loginPageRedir",
