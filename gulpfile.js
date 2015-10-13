@@ -82,7 +82,7 @@ gulp.task('watch',function (){
 
 gulp.task('build:clean', function(cb){
   del([
-    'build/**'
+    'login/**'
   ], cb);
 });
 
@@ -102,6 +102,6 @@ gulp.task('build:tidy', ['build:copy'], function(cb){
   ], cb);
 });
 
-gulp.task('build',['scripts','styles','mustache','build:copy','build:tidy']);
+gulp.task('build',['build:clean','scripts','styles','mustache','build:copy','build:tidy']);
 //Default Task
 gulp.task('default', ['scripts','styles','mustache','browser-sync','watch']);
