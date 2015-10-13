@@ -4,6 +4,17 @@
 
 Provides basic login/session context functionality based on pyramid's
 authorization/authentication framework.
+
+This module is configured with two asset directories:
+* the 'static_assets_login' directory
+* the 'static_assets_project' directory
+
+This module serves the first match in this list.
+
+* /api/login and /api/logout
+* /login redirects to /login/
+* /login/* serves everything in static_assets_login using login.html as index
+* selected resources from static_assets_project as specified by config.json
 '''
 
 import base64
@@ -11,11 +22,13 @@ import random
 import hashlib
 import os.path
 import logging
+import json
 
 from pyramid.httpexceptions import (HTTPBadRequest, HTTPForbidden,
                                     HTTPFound, HTTPNotFound)
 
 from pyramid.response import Response, FileResponse
+from pyramid.static import static_view
 
 # create authentication/authorization framework
 from pyramid.authentication import AuthTktAuthenticationPolicy
@@ -28,8 +41,19 @@ from pyramid.security import (NO_PERMISSION_REQUIRED,
 
 here = os.path.dirname(os.path.abspath(__file__))
 repository_root = os.path.dirname(here)  # should be one level further down
+
+# get these from configuration / config.json
+peter_config = json.load(open(os.path.join(repository_root,
+                                           "login",
+                                           "config.json"),
+                              "r"))
+
 static_assets_login = os.path.join(repository_root,
-                                   'build')
+                                   'login')
+# that might come from peter_config
+# confusingly this is the same right now!
+static_assets_project = os.path.join(repository_root,
+                                     'login')
 
 
 # todo: has to be implemented properly
@@ -50,6 +74,10 @@ class RootFactory:
 
     def __init__(self, request):
         pass
+
+
+def loginPageRedirect(request):
+    return HTTPFound("/login/")
 
 
 def loginAPIView(request):
@@ -106,103 +134,20 @@ def logoutAPIView(request):
 
 
 def loginPageView(request):
-    """
-    login.html might need resources from this site, these should be served
-    instead of being redirected as well. What are these resources?
-    this is configurable in config.json and is a list of paths in
-    build/config.json .
+    # todo: assure this file is there
 
-    These paths are relative to the location of the index.html file
-    customCSS and logoPath if the customCSS and showLogo are True respectively.
-
-    .. code-block:: json
-
-    {
-      "product":"Example Product",
-      "customCSS" : false,
-      "cssPath" : "css/custom.css",
-      "showLogo" : true,
-      "logoPath" : "images/logo.svg",
-      "successURL" : "/"
-    }
-    """
-    logging.debug("loginPageView view")
-
-    if request.has_permission("view") is Allowed:
-        return HTTPFound("/")  # success url
-
-    indexPath = os.path.join(static_assets_login, "index.html")
-    if os.path.isfile(indexPath):
-        return FileResponse(indexPath,
-                            content_type="text/html",
-                            request=request)
-    else:
-        return HTTPNotFound(request=request)
+    return FileResponse(os.path.join(static_assets_login, "login.html"),
+                        request=request)
 
 
-def loginPageResources(request):
-    logging.debug("loginPageResources view")
-    if request.path == "/css/custom.css":
-        cssPath = os.path.join(static_assets_login, "css/custom.css")
-        if os.path.isfile(cssPath):
-            return FileResponse(cssPath,
-                                request=request)
-        else:
-            return HTTPNotFound(request=request)
-    elif request.path == "/images/logo.svg":
-        logoPath = os.path.join(static_assets_login, "images/logo.svg")
-        if os.path.isfile(logoPath):
-            return FileResponse(logoPath,
-                                request=request)
-        else:
-            return HTTPNotFound(request=request)
-    elif request.path == "/config.json":
-        configPath = os.path.join(static_assets_login, "config.json")
-        if os.path.isfile(configPath):
-            return FileResponse(configPath,
-                                request=request)
-        else:
-            return HTTPNotFound(request=request)
-    else:
-        return HTTPForbidden(request=request)
+class projectView(static_view):
 
+    def __call__(self, context, request):
+        if not request.has_permission("view"):
+            return HTTPFound("/login/",
+                             request=request)
 
-def app_view(request):
-    """
-    :rtype: pyramid.Respone
-
-    provide non-asset or image requests, redirects to ``/login`` if no valid
-    session context established. (to be fixed!)
-    """
-    logging.debug("app_view view")
-
-    if request.has_permission("view") is not Allowed:
-        return HTTPFound(request=request, location="/login.html")
-
-    # assume this is the path for the application
-    if request.path == "/" or request.path == "/index.html":
-
-        indexPath = os.path.join(static_assets_login, "index.html")
-        if os.path.isfile(indexPath):
-            return FileResponse(indexPath,
-                                content_type="text/html",
-                                request=request)
-        else:
-            return HTTPNotFound(request=request)
-
-    pathRequested = os.path.join(static_assets_login, request.path.lstrip("/"))
-
-    # secure against path traversal with .. or similar
-    if pathRequested.startswith(static_assets_login):
-        if os.path.isfile(pathRequested):
-            return FileResponse(pathRequested,
-                                request=request)
-        else:
-            # might not be there
-            return HTTPNotFound(request=request)
-    else:
-        # invalid path
-        return HTTPNotFound(request=request)
+        return static_view.__call__(self, context, request)
 
 
 def includeme(config):
@@ -261,30 +206,80 @@ def includeme(config):
                     route_name="logout",
                     permission=NO_PERMISSION_REQUIRED)
 
-    # this serves the login screen
-    config.add_route("loginPage",
-                     "/login.html")
-    config.add_view(loginPageView,
-                    route_name='loginPage')
-    config.add_route("loginPageCSS",
-                     "/css/custom.css")
-    config.add_view(loginPageResources,
-                    route_name='loginPageCSS')
-    config.add_route("loginPageLogo",
-                     "/images/logo.svg")
-    config.add_view(loginPageResources,
-                    route_name='loginPageLogo')
-    config.add_route("loginPageConfig",
-                     "/config.json")
-    config.add_view(loginPageResources,
-                    route_name='loginPageConfig')
+    # a special exception for Caleb's test:
+    # loggedin.html only being served when logged in
+    def loggedInView(request):
+        if not request.has_permission('read'):
+            return loginPageRedirect(request)
+        else:
+            FileResponse(static_assets_login, "loggedin.html")
+    config.add_route("login.loggedin",
+                     "/loggedin.html")
+    config.add_view(loginPageRedirect,
+                    route_name='login.loggedin')
 
-    # that serves the application if permissions granted!
-    config.add_route('simone_app',
-                     '*subpath')
-    config.add_view(app_view,
-                    route_name='simone_app')
-    config.add_route('simone_app2',
-                     '/')
-    config.add_view(app_view,
-                    route_name='simone_app2')
+    # this serves the login screen
+    config.add_route("loginPageRedir",
+                     "/login")
+    config.add_view(loginPageRedirect,
+                    route_name='loginPageRedir')
+
+    config.add_route("loginPage",
+                     "/login/*subpath")
+    config.add_view(static_view(static_assets_login,
+                                use_subpath=True),
+                    route_name='loginPage')
+
+    # generate all resource routes needed from the project folder
+    # each string is a URL, which is a file or a directory being served in the
+    # static_assets_project directory
+
+    projectAssets = []  # get from peter_config
+
+    if peter_config["showLogo"]:
+        projectAssets.append(peter_config["logoPath"])
+    if peter_config["customCSS"]:
+        projectAssets.append(peter_config["cssPath"])
+
+    for projectAsset in projectAssets:
+
+        if projectAsset.startswith("/"):
+            # make this relative to project assets directory
+            projectAsset.lstrip("/")
+
+        fileLocation = os.path.realpath(os.path.join(static_assets_project,
+                                                     projectAsset))
+
+        if not fileLocation.startswith(
+                    os.path.realpath(static_assets_project)):
+            # skip that one, it is outside the project
+            logging.warn("%s is outside the project files" % projectAsset)
+            continue
+
+        if os.path.isfile(fileLocation):
+            def projectFileResponse(request):
+                return FileResponse(fileLocation,
+                                    request=request)
+            # do a file response
+            config.add_route("login.projectAssetFile.%s" % projectAsset,
+                             "/login/"+projectAsset)
+            config.add_view(projectFileResponse,
+                            route_name=("login.projectAssetFile.%s" %
+                                        projectAsset))
+
+        elif os.path.isdir(fileLocation):
+            # do a file response
+            projectAsset = projectAsset.rstrip("/")
+            config.add_route("login.projectAssetFile.%s" % projectAsset,
+                             "/login/"+projectAsset+"/*subpath")
+            config.add_view(static_view(fileLocation,
+                                        use_subpath=True),
+                            route_name=("login.projectAssetFile.%s" %
+                                        projectAsset))
+
+    # and now a catch-all
+    config.add_route("protectedProject",
+                     "/*subpath")
+    config.add_view(projectView(static_assets_project,
+                                use_subpath=True),
+                    route_name="protectedProject")
