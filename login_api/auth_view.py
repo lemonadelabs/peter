@@ -80,8 +80,16 @@ class RootFactory:
 def loginPageRedirect(request):
 
     # append direct information
+    redirect = request.path
+    if redirect in ["", "/"] or redirect.startswith("/login"):
+        # don't do a redirect in these cases
+        return HTTPFound("/login/")
 
-    return HTTPFound("/login/login.html?%s" % urlencode({"redir": request.path}),
+    if redirect[0] == "/":
+        redirect = redirect[1:]
+
+    return HTTPFound("/login/login?%s" %
+                     urlencode({"redir": request.path}),
                      request=request)
 
 
@@ -198,11 +206,6 @@ def includeme(config):
     config.add_view(loginAPIView,
                     route_name="login",
                     permission=NO_PERMISSION_REQUIRED)
-    config.add_route("login_w_redir",
-                     '/api/login/*subpath',)
-    config.add_view(loginAPIView,
-                    route_name="login_w_redir",
-                    permission=NO_PERMISSION_REQUIRED)
     config.add_route('logout',
                      '/api/logout')
     config.add_view(logoutAPIView,
@@ -224,7 +227,7 @@ def includeme(config):
                     route_name='login.loggedin')
 
     def convenienceLoginForward(request):
-        return HTTPFound("/login/login.html")
+        return HTTPFound("/login/")
 
     # this is a convenience forward
     config.add_route("loginPageRedir",
@@ -236,7 +239,8 @@ def includeme(config):
     config.add_route("loginPage",
                      "/login/*subpath")
     config.add_view(static_view(static_assets_login,
-                                use_subpath=True),
+                                use_subpath=True,
+                                index="login.html"),
                     route_name='loginPage')
 
     # generate all resource routes needed from the project folder
@@ -277,7 +281,7 @@ def includeme(config):
                                         projectAsset))
 
         elif os.path.isdir(fileLocation):
-            # do a file response
+            # create a static view
             projectAsset = projectAsset.rstrip("/")
             config.add_route("login.projectAssetFile.%s" % projectAsset,
                              "/login/"+projectAsset+"/*subpath")
@@ -286,7 +290,7 @@ def includeme(config):
                             route_name=("login.projectAssetFile.%s" %
                                         projectAsset))
 
-    # and now a catch-all
+    # and now a catch-all which serves the project's static files
     config.add_route("protectedProject",
                      "/*subpath")
     config.add_view(projectView(static_assets_project,
