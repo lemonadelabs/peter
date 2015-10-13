@@ -88,7 +88,7 @@ def loginPageRedirect(request):
     if redirect[0] == "/":
         redirect = redirect[1:]
 
-    return HTTPFound("/login/login?%s" %
+    return HTTPFound("/login/?%s" %
                      urlencode({"redir": request.path}),
                      request=request)
 
