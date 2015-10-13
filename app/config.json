@@ -4,5 +4,7 @@
   "cssPath" : "css/custom.css",
   "showLogo" : true,
   "logoPath" : "images/logo.svg",
-  "successURL" : "/loggedin.html"
+  "successURL" : "/loggedin.html",
+  "externalResourcesUrls" : ["../dist/images"],
+  "externalAssetDirectory" : ["/images"]
 }

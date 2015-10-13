@@ -13,10 +13,10 @@
   </head>
   <body>
     <main class="login-main">
-      {{#showLogo}}
-        <img src="{{logoPath}}" alt="{{product}}" class="login-logo">
-      {{/showLogo}}
       <div class="login-box">
+        {{#showLogo}}
+          <img src="{{logoPath}}" alt="{{product}}" class="login-logo">
+        {{/showLogo}}
         <p class="login-message">Please login to {{product}}</p>
         <form id="login-form">
           <input type="text" name="username" value="" placeholder="Username">

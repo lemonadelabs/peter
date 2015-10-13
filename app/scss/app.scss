@@ -15,13 +15,20 @@ html {
   width: 960px;
 }
 
+.login-logo{
+  width: 300px;
+  height: auto;
+  margin-bottom: 30px;
+  margin-left: -25%;
+}
+
 .login-box {
   position: absolute;
-  top: 50%;
+  top: 45%;
   left: 50%;
   width: 200px;
-  height: 150px;
-  margin-top: -75px;
+  height: 240px;
+  margin-top: -120px;
   margin-left: -100px;
 
   p {
@@ -39,12 +46,12 @@ html {
 }
 .denied{
   animation-name: not-alowed;
-  animation-duration: 1s;
+  animation-duration: 0.5s;
   animation-timing-function: ease-in-out;
 }
 @keyframes not-alowed {
     0% {transform: translateX(0px);}
-    30% {transform: translateX(-40px);}
-    60% {transform: translateX(40px);}
+    30% {transform: translateX(-20px);}
+    60% {transform: translateX(20px);}
     100% {transform: translateX(0px);}
 }

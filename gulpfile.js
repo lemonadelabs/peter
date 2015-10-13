@@ -56,6 +56,7 @@ gulp.task('browser-sync', function(){
   browserSync({
     server:{
       baseDir: "./app/",
+      index: "login.html",
       middleware: [proxy(proxyOptions)]
     }
   });
@@ -65,7 +66,8 @@ gulp.task('browser-sync', function(){
 gulp.task('build:serve', function(){
   browserSync({
     server:{
-      baseDir: "./build/"
+      baseDir: "./login/",
+      index: "login.html"
     }
   });
 });
@@ -86,17 +88,17 @@ gulp.task('build:clean', function(cb){
 
 gulp.task('build:copy', function(){
   return gulp.src('app/**/*')
-  .pipe(gulp.dest('build'));
+  .pipe(gulp.dest('login'));
 });
 
 gulp.task('build:tidy', ['build:copy'], function(cb){
   del([
-    'build/scss/',
-    //'build/templates/',
-    'build/js/!(*.min.js)',
-    'build/bower_components/**/src/',
-    'build/bower_components/**/dist/!(*.min.js)',
-    'build/bower_components/**/js/!(*.min.js)'
+    'login/scss/',
+    'login/templates/',
+    'login/js/!(*.min.js)',
+    'login/bower_components/**/src/',
+    'login/bower_components/**/dist/!(*.min.js)',
+    'login/bower_components/**/js/!(*.min.js)'
   ], cb);
 });
 

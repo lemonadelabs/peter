@@ -40,7 +40,8 @@ function login(){
   .fail(function(data){
     if(data.status === 403){
       $(".login-message").html("Username or password invalid.");
-      $(".login-box").addClass("denied");
+      $("#login-form").removeClass('denied').width(); // reading width() forces reflow
+      $("#login-form").addClass('denied');
     }
     if(data.status === 404){
       $(".login-message").html("Could not find login server.");
