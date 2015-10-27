@@ -54,22 +54,39 @@ class peter:
 
     def __init__(self,
                  pyramidConfig,
+                 peter_config_file,
                  static_assets_peter,
                  static_assets_project,
                  authenticationInterface,
                  minimalPermissions):
+
+        """
+        :param: pyramidConfig is the configuration to which the routes and
+           views are added.
+
+        :param: authenticationInterface is a callable, taking user and password
+           and returning None if authentication fails or the username as it
+           should be remembered.
+        """
 
         # own root object without any permission
         self.credentialsCheck = authenticationInterface
         self.static_assets_login = static_assets_peter
         self.static_assets_project = static_assets_project
         self.minimalPermissions = minimalPermissions
-        peter_config = json.load(open(os.path.join(self.static_assets_login,
-                                                   "config.json"),
-                                      "r"))
+        peter_config = json.load(open(peter_config_file, "r"))
         # setup routes and views
         # these are the API functions, serve them always
         # add own root factory
+
+        # insert the config file
+        pyramidConfig.add_route('peter.api.config',
+                                '/api/login/config.json',
+                                factory=peterResourceRoot)
+        pyramidConfig.add_view(static_view(peter_config_file),
+                               route_name="peter.api.config",
+                               permission=NO_PERMISSION_REQUIRED)
+
         pyramidConfig.add_route('peter.api.login',
                                 '/api/login',
                                 factory=peterResourceRoot)
@@ -87,20 +104,20 @@ class peter:
             return HTTPFound("/login/")
 
         # this is a convenience forward
-        pyramidConfig.add_route("loginPageRedir",
+        pyramidConfig.add_route("peter.loginPageRedir",
                                 "/login",
                                 factory=peterResourceRoot)
         pyramidConfig.add_view(convenienceLoginForward,
-                               route_name='loginPageRedir')
+                               route_name='peter.loginPageRedir')
 
         # this serves the login screen
-        pyramidConfig.add_route("loginPage",
+        pyramidConfig.add_route("peter.loginPage",
                                 "/login/*subpath",
                                 factory=peterResourceRoot)
         pyramidConfig.add_view(static_view(self.static_assets_login,
                                            use_subpath=True,
                                            index="login.html"),
-                               route_name='loginPage')
+                               route_name='peter.loginPage')
 
         # generate all resource routes needed from the project folder
         # each string is a URL, which is a file or a directory being served
@@ -184,14 +201,16 @@ class peter:
         # todo: read out password from db
         thePassword = request.POST["password"]
 
+        checkedUser = self.credentialsCheck(theUser, thePassword)
+
         # make sure there is some user name
-        if not self.credentialsCheck(theUser, thePassword):
+        if checkedUser is None:
             logging.debug("login of user '%s' failed" % theUser)
             return HTTPForbidden(explanation="password does not match",
                                  request=request)
 
         logging.debug("login of user '%s' succeeded" % theUser)
-        response_headers = remember(request, theUser)
+        response_headers = remember(request, checkedUser)
         response = Response(headers=response_headers)
         return response
 

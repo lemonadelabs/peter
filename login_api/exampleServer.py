@@ -32,8 +32,10 @@ def credentialsCheck(user, passwordHash):
     passwordhash = hashlib.md5()
     passwordhash.update(thePassword.encode('utf8'))
 
-    return (user != "" and
-            passwordHash == passwordhash.hexdigest())
+    if (user == "" or passwordHash != passwordhash.hexdigest()):
+        return None
+
+    return user
 
 
 # todo: has to be implemented properly
@@ -78,12 +80,6 @@ class projectView(static_view):
 
 
 def createAuthFramework(config):
-    static_assets_login = os.path.join(repository_root,
-                                       'login')
-    # that might come from peter_config
-    # confusingly this is the same right now!
-    static_assets_project = os.path.join(repository_root,
-                                         'login')
 
     settings = config.get_settings()
     # no timeout is default
@@ -112,8 +108,16 @@ def createAuthFramework(config):
     config.set_authentication_policy(authn_policy)
     config.set_authorization_policy(authz_policy)
 
+    static_assets_login = os.path.join(repository_root,
+                                       'login')
+    # that might come from peter_config
+    # confusingly this is the same right now!
+    static_assets_project = os.path.join(repository_root,
+                                         'login')
+
     from peter import peter
     p = peter(config,
+              os.path.join(static_assets_login, "config.json"),
               static_assets_login,
               static_assets_project,
               credentialsCheck,  # hand over authentication method
