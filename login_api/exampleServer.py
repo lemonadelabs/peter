@@ -58,27 +58,6 @@ class RootFactory:
         pass
 
 
-class projectView(static_view):
-    """
-    project static file server with permission check and redirect to
-    login if not logged in.
-    """
-
-    def __init__(self, p):
-        self.loginRedirect = p.loginPageRedirect
-        self.minPermissions = p.minimalPermissions
-        static_view.__init__(self,
-                             root_dir=p.static_assets_project,
-                             use_subpath=True)
-
-    def __call__(self, context, request):
-        if not request.has_permission(self.minPermissions,
-                                      context=context):
-            return self.loginRedirect(request)
-
-        return static_view.__call__(self, context, request)
-
-
 def createAuthFramework(config):
 
     settings = config.get_settings()
@@ -117,20 +96,17 @@ def createAuthFramework(config):
 
     from peter import peter
     p = peter(config,
-              os.path.join(static_assets_login, "config.json"),
               static_assets_login,
               static_assets_project,
               credentialsCheck,  # hand over authentication method
-              "view")
-
-    # and here the API calls
-    # todo
+              projectMinPermissions="view"
+              )
 
     # and now a catch-all which serves the project's static files
     config.add_route("protectedProject",
                      "/*subpath",
                      factory=RootFactory)
-    config.add_view(projectView(p),
+    config.add_view(p.staticAssetsProjectView,
                     route_name="protectedProject")
 
 

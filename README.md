@@ -58,33 +58,35 @@ import the `peter` class and set it up with pointers to the peter assets and the
 assets of the other project:
 
 ```
+# replace this with your authenticator
 def authenticator(user, passwd)
     if checked(passwd)
-        # return name or id the user should be rememberd
+        # return name or id the user should be remembered
         return user
     # if not successful, return None
     return None
 
 from peter import peter
-peter(pyramidConfig,
-      path_to_peter_login_dir,
-      path_to_project_assets_dir,
-      authenticator)
+p = peter(pyramidConfig,
+          path_to_peter_login_dir,
+          path_to_project_assets_dir,
+          authenticator)
 ```
 
 As the `remember` and `forget` methods are used by `peter`, a pyramid authentication policy is required.
 
-The project assets can be served by including this view:
+The project assets can be served by including this view provided by the peter instance:
 
 ```
 config.add_route("protectedProject",
                  "/*subpath",
                  factory=RootFactory)
-config.add_view(projectView(p),
+config.add_view(p.staticAssetsProjectView,
                 route_name="protectedProject")
 ```
 
 As it is a "catch-all" route, this route needs to be added at the end of the pyramid configuration.
+If not logged in, this view will forward to the login screen.
 
 ### example implementation
 

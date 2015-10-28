@@ -54,11 +54,10 @@ class peter:
 
     def __init__(self,
                  pyramidConfig,
-                 peter_config_file,
                  static_assets_peter,
                  static_assets_project,
                  authenticationInterface,
-                 minimalPermissions):
+                 projectMinPermissions="view"):
 
         """
         :param: pyramidConfig is the configuration to which the routes and
@@ -73,7 +72,8 @@ class peter:
         self.credentialsCheck = authenticationInterface
         self.static_assets_login = static_assets_peter
         self.static_assets_project = static_assets_project
-        self.minimalPermissions = minimalPermissions
+        self.minPermissions = projectMinPermissions
+        peter_config_file = os.path.join(static_assets_peter, "config.json")
         peter_config = json.load(open(peter_config_file, "r"))
         # setup routes and views
         # these are the API functions, serve them always
@@ -169,6 +169,16 @@ class peter:
                                                    use_subpath=True),
                                        route_name=("peter.projectAsset.%s" %
                                                    projectAsset))
+
+        self.projectView = static_view(root_dir=self.static_assets_project,
+                                       use_subpath=True)
+
+    def staticAssetsProjectView(self, context, request):
+        if not request.has_permission(self.minPermissions,
+                                      context=context):
+            return self.loginPageRedirect(request)
+
+        return self.projectView(context, request)
 
     def loginAPIView(self, request):
         """
