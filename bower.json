@@ -18,6 +18,7 @@
     "jquery": "~2.1.4"
   },
   "devDependencies": {
-    "blueimp-md5": "blueimp/JavaScript-MD5#~1.1.1"
+    "blueimp-md5": "blueimp/JavaScript-MD5#~1.1.1",
+    "SHA-1": "~0.1.1"
   }
 }

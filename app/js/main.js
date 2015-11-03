@@ -22,7 +22,7 @@ function addListeners() {
 function login(){
   var username = $("input[name='username']").val();
   var password = $("input[name='password']").val();
-  var passwordHashed = md5(password);
+  var passwordHashed = sha1(password);
   var currentURL = document.location;
   $(".login-message").html("Logging in");
   $.post("/api/login",
