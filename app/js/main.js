@@ -24,6 +24,8 @@ function login(){
   var password = $("input[name='password']").val();
   var passwordHashed = sha1(password);
   var currentURL = document.location;
+  console.log(currentURL);
+
   $(".login-message").html("Logging in");
   $.post("/api/login",
     {
@@ -32,10 +34,16 @@ function login(){
     })
   .done(function(data, status){
     //move the browser location to the new url
-    console.log(currentURL);
-    if(currentURL.hash!==undefined){
-      document.location.assign(currentURL.origin+config.successURL);
+    var hash;
+    if(currentURL.hash!==""){
+      console.log(currentURL.hash);
+      document.location.assign(currentURL.origin+currentURL.pathname+"/../"+currentURL.hash);
     }
+    else{
+      document.location.assign(currentURL.origin+currentURL.pathname+"/../");
+      //document.location.assign(currentURL.origin+config.successURL);
+    }
+    //document.location.assign(currentURL.origin+config.successURL);
   })
   .fail(function(data){
     if(data.status === 403){
