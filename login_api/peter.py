@@ -17,13 +17,16 @@ This module serves the first match in this list.
 * selected resources from static_assets_project as specified by config.json
 '''
 
-
+import base64
+import random
+import datetime
 import logging
 import json
 import os.path
 
 from pyramid.httpexceptions import (HTTPBadRequest, HTTPForbidden,
-                                    HTTPFound)
+                                    HTTPFound, HTTPNotFound,
+                                    HTTPInternalServerError)
 
 from pyramid.response import Response, FileResponse
 from pyramid.static import static_view
@@ -73,19 +76,9 @@ class peter:
         self.static_assets_login = static_assets_peter
         self.static_assets_project = static_assets_project
         self.minPermissions = projectMinPermissions
-        peter_config_file = os.path.join(static_assets_peter, "config.json")
-        peter_config = json.load(open(peter_config_file, "r"))
         # setup routes and views
         # these are the API functions, serve them always
         # add own root factory
-
-        # insert the config file
-        pyramidConfig.add_route('peter.api.config',
-                                '/api/login/config.json',
-                                factory=peterResourceRoot)
-        pyramidConfig.add_view(static_view(peter_config_file),
-                               route_name="peter.api.config",
-                               permission=NO_PERMISSION_REQUIRED)
 
         pyramidConfig.add_route('peter.api.login',
                                 '/api/login',
@@ -93,11 +86,26 @@ class peter:
         pyramidConfig.add_view(self.loginAPIView,
                                route_name="peter.api.login",
                                permission=NO_PERMISSION_REQUIRED)
+
         pyramidConfig.add_route('peter.api.logout',
                                 '/api/logout',
                                 factory=peterResourceRoot)
         pyramidConfig.add_view(self.logoutAPIView,
                                route_name="peter.api.logout",
+                               permission=NO_PERMISSION_REQUIRED)
+
+        pyramidConfig.add_route("peter.api.resetRequest",
+                                "/api/resetrequest",
+                                factory=peterResourceRoot)
+        pyramidConfig.add_view(self.resetRequestView,
+                               route_name="peter.api.resetRequest",
+                               permission=NO_PERMISSION_REQUIRED)
+
+        pyramidConfig.add_route("peter.api.resetPassword",
+                                "/api/resetpassword",
+                                factory=peterResourceRoot)
+        pyramidConfig.add_view(self.resetPasswordView,
+                               route_name="peter.api.resetPassword",
                                permission=NO_PERMISSION_REQUIRED)
 
         def convenienceLoginForward(request):
@@ -123,6 +131,8 @@ class peter:
         # each string is a URL, which is a file or a directory being served
         # in the static_assets_project directory
 
+        peter_config_file = os.path.join(static_assets_peter, "config.json")
+        peter_config = json.load(open(peter_config_file, "r"))
         projectAssets = []  # get from peter_config
 
         if peter_config["showLogo"]:
@@ -172,6 +182,148 @@ class peter:
 
         self.projectView = static_view(root_dir=self.static_assets_project,
                                        use_subpath=True)
+
+    def resetRequestView(self, context, request):
+        """
+        expect username, generate and store token, send it by email
+        this token will be used with the new password to resetAction
+
+        maybe emailaddress to verify account (a little bit)
+        """
+        logging.debug("reset request")
+        if "username" not in request.params:
+            return HTTPBadRequest("no username supplied")
+
+        username = request.params["username"]
+
+        # get email address
+        email = self.getEmailAddress(username)
+        if email is None:
+            return HTTPNotFound("user not found or has no email address")
+
+        # todo: check whether email supplied is the same?!
+
+        token = self.tokenGenerator()
+
+        expiryDate = datetime.datetime.now()+datetime.timedelta(24*3600)
+        self.storeToken(token, "resetPwd", username, expiryDate)
+
+        tokenURL = request.route_url("peter.loginPage",
+                                     subpath="resetPassword.html",
+                                     _query=({"username": username,
+                                              "token": token}))
+
+        self.sendPasswordResetEmail(username, email, tokenURL)
+        response = Response()
+        return response
+
+    def resetPasswordView(self, context, request):
+
+        if not ("token" in request.params and
+                "newPasswordHash" in request.params):
+            return HTTPBadRequest("'token' or 'newPasswordHash'"
+                                  " parameters missing")
+
+        token = request.params["token"]
+        pwdHash = request.params["newPasswordHash"]
+
+        tokenInfo = self.retreiveToken(token)
+        if tokenInfo is None:
+            # do not say much!
+            return HTTPForbidden("invalid token")
+
+        purpose, username, expiryDate = tokenInfo
+        if purpose != "resetPwd":
+            # do not say much!
+            return HTTPForbidden("invalid token")
+
+        if expiryDate < datetime.datetime.now():
+            # do not say much!
+            self.invalidateToken(token)
+            return HTTPForbidden("invalid token")
+
+        # todo: any password policy?
+        # todo: check return value
+        self.resetPassword(username, pwdHash)
+
+        self.invalidateToken(token)
+        return Response()
+
+    def getEmailAddress(self, username):
+        if username == "achim":
+            return "achim.gaedke@lemonadelabs.io"
+
+        return None
+
+    def resetPassword(self, username, pwdHash):
+        logging.info("resetting password for user %s" % username)
+
+    def tokenGenerator(self):
+        tokenLength = 24  # should be a multiple of 4
+
+        token = base64.urlsafe_b64encode(bytes([random.randrange(0, 256)
+                                                for _ in range(
+                                                    int(tokenLength/4*3))]
+                                               )
+                                         ).decode('utf-8')
+        return token
+
+    def storeToken(self, token, purpose, username, expiryDate):
+        if not hasattr(self, "tokenStorage"):
+            self.tokenStorage = {}
+
+        self.tokenStorage[token] = (purpose, username, expiryDate)
+
+    def retreiveToken(self, token):
+        if not hasattr(self, "tokenStorage"):
+            return None
+
+        return self.tokenStorage.get(token, None)
+
+    def invalidateToken(self, token):
+        if not hasattr(self, "tokenStorage"):
+            return None
+
+        if token in self.tokenStorage:
+            del self.tokenStorage[token]
+
+    def sendPasswordResetEmail(self, username, email, tokenURL):
+
+        # find out first and last name
+
+        subject = "Password Reset for Simone"
+        text = "Hello %s!\n%s" % (username, tokenURL)
+
+        api_key = ""  # todo: readout from config file!
+        email = "Achim.Gaedke@lemonadelabs.io"
+        fullname = "Achim Gaedke"
+
+        # https://mandrillapp.com/api/docs/messages.python.html#method=send
+        import mandrill
+        try:
+            mandrill_client = mandrill.Mandrill(api_key)
+            message = {'auto_html': True,
+                       'from_email': 'simone@lemonadelabs.io',
+                       'from_name': 'simone@lemonadelabs.io',
+                       'headers': {'Reply-To': 'support@lemonadelabs.io'},
+                       'subject': subject,
+                       'text': text,
+                       'to': [{'email': email,
+                               'name': fullname,
+                               'type': 'to'}],
+                       'url_strip_qs': None}
+            result = mandrill_client.messages.send(message=message,
+                                                   async=False,
+                                                   ip_pool='Main Pool',
+                                                   )
+        except mandrill.Error as e:
+            # Mandrill errors are thrown as exceptions
+            logging.error('A mandrill error occurred: %s - %s' %
+                          (e.__class__, e))
+
+            raise HTTPInternalServerError
+        finally:
+            del result
 
     def staticAssetsProjectView(self, context, request):
         if not request.has_permission(self.minPermissions,
@@ -228,6 +380,7 @@ class peter:
         """
         invalidates the session when ``/api/logout`` is called.
         """
+        logging.debug("logout")
         # will logout have some username/email info?
         response_headers = forget(request)
         response = Response(headers=response_headers)

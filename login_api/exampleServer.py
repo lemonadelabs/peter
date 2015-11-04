@@ -29,7 +29,8 @@ repository_root = os.path.dirname(here)
 def credentialsCheck(user, passwordHash):
 
     thePassword = "tuatara"
-    passwordhash = hashlib.md5()
+    #passwordhash = hashlib.md5()
+    passwordhash = hashlib.sha1()
     passwordhash.update(thePassword.encode('utf8'))
 
     if (user == "" or passwordHash != passwordhash.hexdigest()):
