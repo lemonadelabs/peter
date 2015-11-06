@@ -25,8 +25,7 @@ import json
 import os.path
 
 from pyramid.httpexceptions import (HTTPBadRequest, HTTPForbidden,
-                                    HTTPFound, HTTPNotFound,
-                                    HTTPInternalServerError)
+                                    HTTPFound)
 
 from pyramid.response import Response, FileResponse
 from pyramid.static import static_view
@@ -53,32 +52,65 @@ class peterResourceRoot:
 
 class peter:
 
-    # missing here: the code, which serves the project
+    """
+    This project needs a bunch of call-backs.
+
+    If the callbacks are not provided, some features can not be delivered.
+    """
 
     def __init__(self,
                  pyramidConfig,
                  static_assets_peter,
                  static_assets_project,
-                 authenticationInterface,
+                 checkUserPassword,
+                 checkUserEmail=None,
+                 sendPasswordResetEmail=None,
+                 setNewPasswordHash=None,
+                 storeRequestToken=None,
+                 retreiveRequestToken=None,
+                 deleteRequestToken=None,
                  projectMinPermissions="view"):
 
         """
         :param: pyramidConfig is the configuration to which the routes and
            views are added.
 
-        :param: authenticationInterface is a callable, taking user and password
-           and returning None if authentication fails or the username as it
-           should be remembered.
+        :param: checkUserPassword is a callback, taking username and
+           password and returning None if authentication fails or the username
+           as it should be remembered.
+
+        :param: sendResetMail callback taking username, email and
+           reset page URL. Provision and further customization of a template is
+           left to the callback.
+
+        :param: checkUserEmail for password reset: if username and email
+            address do not match, no reminder email is sent.
+
+        :param: setNewPasswordHash takes username and new password hash.
+
+        :param: storeRequestToken a persistent storage for the auth tokens.
+           this callback takes: token, username, requestType, expiryDate
+
+        :param: retreiveRequestToken
+
+        :param: deleteRequestToken
         """
 
         # own root object without any permission
-        self.credentialsCheck = authenticationInterface
+        self.credentialsCheck = checkUserPassword
         self.static_assets_login = static_assets_peter
         self.static_assets_project = static_assets_project
         self.minPermissions = projectMinPermissions
         # setup routes and views
         # these are the API functions, serve them always
         # add own root factory
+
+        self.checkUserEmail = checkUserEmail
+        self.sendPasswordResetEmail = sendPasswordResetEmail
+        self.setNewPasswordHash = setNewPasswordHash
+        self.storeRequestToken = storeRequestToken
+        self.retreiveRequestToken = retreiveRequestToken
+        self.deleteRequestToken = deleteRequestToken
 
         pyramidConfig.add_route('peter.api.login',
                                 '/api/login',
@@ -185,78 +217,38 @@ class peter:
 
     def resetRequestView(self, context, request):
         """
-        expect username, generate and store token, send it by email
+        expect username and email, generate and store token, send it by email
         this token will be used with the new password to resetAction
 
         maybe emailaddress to verify account (a little bit)
         """
-        logging.debug("reset request")
+
         if "username" not in request.params:
             return HTTPBadRequest("no username supplied")
+        if "email" not in request.params:
+            return HTTPBadRequest("no email supplied")
 
         username = request.params["username"]
+        email = request.params["email"]
+        if username == "" or email == "":
+            return HTTPBadRequest("username or email not supplied")
 
-        # get email address
-        email = self.getEmailAddress(username)
-        if email is None:
-            return HTTPNotFound("user not found or has no email address")
-
-        # todo: check whether email supplied is the same?!
+        # check whether email supplied is the same?!
+        if not self.checkUserEmail(username, email):
+            return Response()
 
         token = self.tokenGenerator()
 
         expiryDate = datetime.datetime.now()+datetime.timedelta(24*3600)
-        self.storeToken(token, "resetPwd", username, expiryDate)
+        self.storeRequestToken(token, "resetPwd", username, expiryDate)
 
         tokenURL = request.route_url("peter.loginPage",
                                      subpath="resetPassword.html",
-                                     _query=({"username": username,
-                                              "token": token}))
+                                     _query=({"token": token}))
 
         self.sendPasswordResetEmail(username, email, tokenURL)
         response = Response()
         return response
-
-    def resetPasswordView(self, context, request):
-
-        if not ("token" in request.params and
-                "newPasswordHash" in request.params):
-            return HTTPBadRequest("'token' or 'newPasswordHash'"
-                                  " parameters missing")
-
-        token = request.params["token"]
-        pwdHash = request.params["newPasswordHash"]
-
-        tokenInfo = self.retreiveToken(token)
-        if tokenInfo is None:
-            # do not say much!
-            return HTTPForbidden("invalid token")
-
-        purpose, username, expiryDate = tokenInfo
-        if purpose != "resetPwd":
-            # do not say much!
-            return HTTPForbidden("invalid token")
-
-        if expiryDate < datetime.datetime.now():
-            # do not say much!
-            self.invalidateToken(token)
-            return HTTPForbidden("invalid token")
-
-        # todo: any password policy?
-        # todo: check return value
-        self.resetPassword(username, pwdHash)
-
-        self.invalidateToken(token)
-        return Response()
-
-    def getEmailAddress(self, username):
-        if username == "achim":
-            return "achim.gaedke@lemonadelabs.io"
-
-        return None
-
-    def resetPassword(self, username, pwdHash):
-        logging.info("resetting password for user %s" % username)
 
     def tokenGenerator(self):
         tokenLength = 24  # should be a multiple of 4
@@ -268,62 +260,37 @@ class peter:
                                          ).decode('utf-8')
         return token
 
-    def storeToken(self, token, purpose, username, expiryDate):
-        if not hasattr(self, "tokenStorage"):
-            self.tokenStorage = {}
+    def resetPasswordView(self, context, request):
 
-        self.tokenStorage[token] = (purpose, username, expiryDate)
+        if not ("token" in request.params and
+                "newPasswordHash" in request.params):
+            return HTTPBadRequest("'token' or 'newPasswordHash'"
+                                  " parameters missing")
 
-    def retreiveToken(self, token):
-        if not hasattr(self, "tokenStorage"):
-            return None
+        token = request.params["token"]
+        pwdHash = request.params["newPasswordHash"]
 
-        return self.tokenStorage.get(token, None)
+        tokenInfo = self.retreiveRequestToken(token)
+        if tokenInfo is None:
+            # do not say much!
+            return HTTPForbidden("invalid token")
 
-    def invalidateToken(self, token):
-        if not hasattr(self, "tokenStorage"):
-            return None
+        purpose, username, expiryDate = tokenInfo
+        if purpose != "resetPwd":
+            # unknown token, do not say much!
+            return HTTPForbidden("invalid token")
 
-        if token in self.tokenStorage:
-            del self.tokenStorage[token]
+        if expiryDate < datetime.datetime.now():
+            # expired token, do not say much!
+            self.deleteRequestToken(token)
+            return HTTPForbidden("invalid token")
 
-    def sendPasswordResetEmail(self, username, email, tokenURL):
+        # todo: any password policy?
+        # todo: check return value
+        self.setNewPasswordHash(username, pwdHash)
 
-        # find out first and last name
-
-        subject = "Password Reset for Simone"
-        text = "Hello %s!\n%s" % (username, tokenURL)
-
-        api_key = ""  # todo: readout from config file!
-        email = "Achim.Gaedke@lemonadelabs.io"
-        fullname = "Achim Gaedke"
-
-        # https://mandrillapp.com/api/docs/messages.python.html#method=send
-        import mandrill
-        try:
-            mandrill_client = mandrill.Mandrill(api_key)
-            message = {'auto_html': True,
-                       'from_email': 'simone@lemonadelabs.io',
-                       'from_name': 'simone@lemonadelabs.io',
-                       'headers': {'Reply-To': 'support@lemonadelabs.io'},
-                       'subject': subject,
-                       'text': text,
-                       'to': [{'email': email,
-                               'name': fullname,
-                               'type': 'to'}],
-                       'url_strip_qs': None}
-            result = mandrill_client.messages.send(message=message,
-                                                   async=False,
-                                                   ip_pool='Main Pool',
-                                                   )
-        except mandrill.Error as e:
-            # Mandrill errors are thrown as exceptions
-            logging.error('A mandrill error occurred: %s - %s' %
-                          (e.__class__, e))
-
-            raise HTTPInternalServerError
-        finally:
-            del result
+        self.deleteRequestToken(token)
+        return Response()
 
     def staticAssetsProjectView(self, context, request):
         if not request.has_permission(self.minPermissions,
