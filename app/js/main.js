@@ -14,9 +14,6 @@ function addListeners() {
     event.preventDefault();
     login();
   });
-  $("#login").click(function(){
-    login();
-  });
 }
 
 function login(){
