@@ -1,5 +1,6 @@
 //Required
 var gulp = require('gulp'),
+    fs = require('fs'),
     config = require('./app/config.json'),
     mustache = require("gulp-mustache-plus"),
     url = require('url'),
@@ -14,6 +15,11 @@ var gulp = require('gulp'),
     sourcemaps = require('gulp-sourcemaps'),
     htmlInclude = require('gulp-html-tag-include'),
     autoprefixer = require('gulp-autoprefixer');
+
+
+if( fs.existsSync('./app/custom.json')){
+    console.log('config exists');
+}
 //Scripts Task
 gulp.task('scripts', function (){
   gulp.src(['app/js/**/*.js','!app/js/**/*.min.js'])
