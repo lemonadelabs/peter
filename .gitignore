@@ -18,5 +18,6 @@ dist/
 css/
 *.min.*
 *.html
-
+!loggedin.html
+custom.json
 app/index.html
