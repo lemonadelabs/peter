@@ -182,7 +182,7 @@ def createAuthFramework(config):
     # that might come from peter_config
     # confusingly this is the same right now!
     static_assets_project = os.path.join(repository_root,
-                                         'login')
+                                         'example_external_project')
 
     from peter import peter
     p = peter(config,

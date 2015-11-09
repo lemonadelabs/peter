@@ -14,14 +14,12 @@ This module serves the first match in this list.
 * /api/login and /api/logout
 * /login redirects to /login/
 * /login/* serves everything in static_assets_login using login.html as index
-* selected resources from static_assets_project as specified by config.json
 '''
 
 import base64
 import random
 import datetime
 import logging
-import json
 import os.path
 
 from pyramid.httpexceptions import (HTTPBadRequest, HTTPForbidden,
@@ -158,59 +156,6 @@ class peter:
                                            use_subpath=True,
                                            index="login.html"),
                                route_name='peter.loginPage')
-
-        # generate all resource routes needed from the project folder
-        # each string is a URL, which is a file or a directory being served
-        # in the static_assets_project directory
-
-        peter_config_file = os.path.join(static_assets_peter, "config.json")
-        peter_config = json.load(open(peter_config_file, "r"))
-        projectAssets = []  # get from peter_config
-
-        if peter_config["showLogo"]:
-            projectAssets.append(peter_config["logoPath"])
-        if peter_config["customCSS"]:
-            projectAssets.append(peter_config["cssPath"])
-
-        for projectAsset in projectAssets:
-
-            if projectAsset.startswith("/"):
-                # make this relative to project assets directory
-                projectAsset.lstrip("/")
-
-            fileLocation = os.path.realpath(os.path.join(static_assets_project,
-                                                         projectAsset))
-
-            if not fileLocation.startswith(
-                        os.path.realpath(static_assets_project)):
-                # skip that one, it is outside the project
-                logging.warn("%s is outside the project files" % projectAsset)
-                continue
-
-            if os.path.isfile(fileLocation):
-                def projectFileResponse(request):
-                    return FileResponse(fileLocation,
-                                        request=request)
-                # do a file response
-                pyramidConfig.add_route("peter.projectAsset.%s" %
-                                        projectAsset,
-                                        "/login/"+projectAsset,
-                                        factory=peterResourceRoot)
-                pyramidConfig.add_view(projectFileResponse,
-                                       route_name=("peter.projectAsset.%s" %
-                                                   projectAsset))
-
-            elif os.path.isdir(fileLocation):
-                # create a static view
-                projectAsset = projectAsset.rstrip("/")
-                pyramidConfig.add_route("peter.projectAsset.%s" %
-                                        projectAsset,
-                                        "/login/"+projectAsset+"/*subpath",
-                                        factory=peterResourceRoot)
-                pyramidConfig.add_view(static_view(fileLocation,
-                                                   use_subpath=True),
-                                       route_name=("peter.projectAsset.%s" %
-                                                   projectAsset))
 
         self.projectView = static_view(root_dir=self.static_assets_project,
                                        use_subpath=True)
