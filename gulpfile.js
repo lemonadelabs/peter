@@ -25,7 +25,6 @@ gulp.task('config', function (){
       for(var key in customSettings){
         config[key] = customSettings[key];
       }
-      console.log(config);
   }
 });
 //Scripts Task
@@ -105,9 +104,8 @@ gulp.task('build:copy', function(){
   .pipe(gulp.dest('login'));
 });
 
-gulp.task('build:copyExternalAssets',['build:copy'], function(){
+gulp.task('build:copyExternalAssets',['build:copy'], function(cb){
   //TODO: Make this a little less crude
-  console.log(fs.readdirSync(config.externalAssetsLocation));
   return gulp.src(config.externalAssetsLocation+'/**/*')
   .pipe(gulp.dest('login'));
 });
