@@ -14,12 +14,20 @@ var gulp = require('gulp'),
     plumber = require('gulp-plumber'),
     sourcemaps = require('gulp-sourcemaps'),
     htmlInclude = require('gulp-html-tag-include'),
-    autoprefixer = require('gulp-autoprefixer');
+    autoprefixer = require('gulp-autoprefixer'),
+    customSettingsLocation = './app/custom.json';
 
+gulp.task('config', function (){
 
-if( fs.existsSync('./app/custom.json')){
-    console.log('config exists');
-}
+  if( fs.existsSync(customSettingsLocation)){
+      console.log('custom config exists');
+      var customSettings = require(customSettingsLocation);
+      for(var key in customSettings){
+        config[key] = customSettings[key];
+      }
+      console.log(config);
+  }
+});
 //Scripts Task
 gulp.task('scripts', function (){
   gulp.src(['app/js/**/*.js','!app/js/**/*.min.js'])
@@ -97,7 +105,14 @@ gulp.task('build:copy', function(){
   .pipe(gulp.dest('login'));
 });
 
-gulp.task('build:tidy', ['build:copy'], function(cb){
+gulp.task('build:copyExternalAssets',['build:copy'], function(){
+  //TODO: Make this a little less crude
+  console.log(fs.readdirSync(config.externalAssetsLocation));
+  return gulp.src(config.externalAssetsLocation+'/**/*')
+  .pipe(gulp.dest('login'));
+});
+
+gulp.task('build:tidy', ['build:copyExternalAssets'], function(cb){
   del([
     'login/scss/',
     'login/templates/',
@@ -108,6 +123,6 @@ gulp.task('build:tidy', ['build:copy'], function(cb){
   ], cb);
 });
 
-gulp.task('build', ['build:clean','scripts','styles','mustache','build:copy','build:tidy']);
+gulp.task('build', ['build:clean','config','scripts','styles','mustache','build:copy','build:copyExternalAssets','build:tidy']);
 //Default Task
-gulp.task('default', ['scripts','styles','mustache','browser-sync','watch']);
+gulp.task('default', ['config','scripts','styles','mustache','browser-sync','watch']);

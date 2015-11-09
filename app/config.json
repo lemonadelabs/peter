@@ -1,10 +1,9 @@
 {
-  "product":"Example Product",
+  "product" : "Example Product",
   "customCSS" : false,
   "cssPath" : "css/custom.css",
   "showLogo" : true,
   "logoPath" : "images/logo.svg",
   "successURL" : "/loggedin.html",
-  "externalResourcesUrls" : ["../dist/images"],
-  "externalAssetDirectory" : ["/images"]
+  "externalAssetsLocation": "example_external_project/assets"
 }
