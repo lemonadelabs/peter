@@ -102,10 +102,10 @@ function login(){
     var hash;
     if(currentURL.hash!==""){
       console.log(currentURL.hash);
-      document.location.assign(currentURL.origin+currentURL.pathname+"/../"+currentURL.hash);
+      document.location.assign(currentURL.origin+currentURL.pathname+"../"+currentURL.hash);
     }
     else{
-      document.location.assign(currentURL.origin+currentURL.pathname+"/../");
+      document.location.assign(currentURL.origin+currentURL.pathname+"../");
       //document.location.assign(currentURL.origin+config.successURL);
     }
     //document.location.assign(currentURL.origin+config.successURL);
