@@ -175,12 +175,15 @@ class peter:
 
         username = request.params["username"]
         email = request.params["email"]
+
         if username == "" or email == "":
             return HTTPBadRequest("username or email not supplied")
 
         # check whether email supplied is the same?!
         if not self.checkUserEmail(username, email):
             return Response()
+        logging.debug("password reset request for %s and %s" % (username,
+                                                                email))
 
         token = self.tokenGenerator()
 
@@ -188,7 +191,7 @@ class peter:
         self.storeRequestToken(token, "resetPwd", username, expiryDate)
 
         tokenURL = request.route_url("peter.loginPage",
-                                     subpath="resetPassword.html",
+                                     subpath="resetpassword.html",
                                      _query=({"token": token}))
 
         self.sendPasswordResetEmail(username, email, tokenURL)
