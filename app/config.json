@@ -1,7 +1,8 @@
 {
   "product" : "Example Product",
-  "customCSS" : false,
-  "cssPath" : "css/custom.css",
+  "customCSS" : [
+    {"cssPath":"css/custom.css"}
+  ],
   "showLogo" : true,
   "logoPath" : "images/logo.svg",
   "successURL" : "/loggedin.html",
