@@ -1,5 +1,11 @@
 var config;
-
+var rank = {
+    TOO_SHORT: 0,
+    WEAK: 1,
+    MEDIUM: 2,
+    STRONG: 3,
+    VERY_STRONG: 4
+};
 $(function() {
   $.getJSON("config.json")
   .done(function(data){
@@ -7,6 +13,18 @@ $(function() {
     config = data;
   });
   addListeners();
+
+  $('input[name="password1"]').tooltipster({
+    trigger: 'custom',
+    position: 'right',
+    contentAsHTML: true
+  });
+
+  $('input[name="password2"]').tooltipster({
+    trigger: 'custom',
+    position: 'right',
+    content: "Passwords don't match"
+  });
 });
 
 function addListeners() {
@@ -23,6 +41,46 @@ function addListeners() {
   $( "#reset-form" ).submit(function( event ) {
     event.preventDefault();
     resetPassword();
+  });
+  $('input[name="password1"]').keyup( function () {
+    var password = $('input[name="password1"]').val();
+    if(password.length>0){
+      $(this).tooltipster('show');
+      testPassword(password);
+    }
+    else{
+      $(this).tooltipster('hide');
+    }
+  })
+  .focus( function() {
+    var password = $(this).val();
+    if(password.length>0){
+      $(this).tooltipster('show');
+    }
+  })
+  .blur( function() {
+    $(this).tooltipster('hide');
+  });
+
+  $('input[name="password2"]').keyup( function () {
+    var password1 = $('input[name="password1"]').val();
+    var password2 = $('input[name="password2"]').val();
+    if(password1 !== password2){
+      $(this).tooltipster('show');
+    }
+    else{
+      $(this).tooltipster('hide');
+    }
+  })
+  .focus( function() {
+    var password1 = $('input[name="password1"]').val();
+    var password2 = $('input[name="password2"]').val();
+    if(password1 !== password2){
+      $(this).tooltipster('show');
+    }
+  })
+  .blur( function() {
+    $(this).tooltipster('hide');
   });
 }
 
@@ -78,6 +136,10 @@ function resetPassword(){
     $(".login-message").html("Passwords not set.");
     formError = true;
   }
+  else if (testPassword(password1)<2){
+    $(".login-message").html("Password need to be at least 'Medium' strength try adding some numbers or symbols.");
+    formError = true;
+  }
   else{
     formError = false;
   }
@@ -90,7 +152,6 @@ function resetPassword(){
 
   var newPasswordHash = sha1(password1);
   var token = getQueryVariable("token");
-  console.log(token);
   if (token === undefined || token === false) {
     //hopefully this doesn't happen.
     $(".login-message").html("Could not find token, try following the link in your email again.");
@@ -108,7 +169,8 @@ function resetPassword(){
   })
   .fail(function(data){
     if(data.status === 403){
-      $(".login-message").html("Username or password invalid.");
+      //TODO: implement a fail counter that asks them to send an email to support if it fails more than 2 times
+      $(".login-message").html("Token is invalid, please request a new password again.");
       $("#login-form").removeClass('denied').width(); // reading width() forces reflow
       $("#login-form").addClass('denied');
     }
@@ -116,6 +178,31 @@ function resetPassword(){
       $(".login-message").html("Could not find login server.");
     }
   });
+}
+
+function testPassword(password){
+  var result = rankPassword(password),
+      labels = ["Too Short", "Weak", "Medium", "Strong", "Very Strong"],
+      tooltipContent = "<b>"+labels[result]+"</b><br>";
+
+  if (result === 0) {
+    tooltipContent += "<span class='tooltip-password-hint'>Your password needs to be over 8 characters.</span>";
+  }
+  else if (result === 1) {
+    tooltipContent += "<span class='tooltip-password-hint'>Your password is too weak, try adding some numbers or capitalising a letter.</span>";
+  }
+  else if (result === 2) {
+    tooltipContent += "<span class='tooltip-password-hint'>Your password is OK, adding some symbols(#!@&) should make it better.</span>";
+  }
+  else if (result === 3) {
+    tooltipContent += "<span class='tooltip-password-hint'>Your password is good.</span>";
+  }
+  else if (result === 4) {
+    tooltipContent += "<span class='tooltip-password-hint'>Your password is very good.</span>";
+  }
+  if($('input[name="password1"]').tooltipster('content') !== tooltipContent){
+    $('input[name="password1"]').tooltipster('content', tooltipContent);
+  }
 }
 
 function forgotPassword(){
@@ -180,4 +267,38 @@ function getQueryVariable(variable)
                if(pair[0] == variable){return pair[1];}
        }
        return(false);
+}
+
+//Taken from https://www.safaribooksonline.com/library/view/regular-expressions-cookbook/9781449327453/ch04s19.html
+function rankPassword(password) {
+    var upper = /[A-Z]/,
+        lower = /[a-z]/,
+        number = /[0-9]/,
+        special = /[^A-Za-z0-9]/,
+        minLength = 8,
+        score = 0;
+
+    if (password.length < minLength) {
+        return rank.TOO_SHORT; // End early
+    }
+
+    // Increment the score for each of these conditions
+    if (upper.test(password)) score++;
+    if (lower.test(password)) score++;
+    if (number.test(password)) score++;
+    if (special.test(password)) score++;
+
+    // Penalize if there aren't at least three char types
+    if (score < 3) score--;
+
+    if (password.length > minLength) {
+        // Increment the score for every 2 chars longer than the minimum
+        score += Math.floor((password.length - minLength) / 2);
+    }
+
+    // Return a ranking based on the calculated score
+    if (score < 3) return rank.WEAK; // score is 2 or lower
+    if (score < 4) return rank.MEDIUM; // score is 3
+    if (score < 6) return rank.STRONG; // score is 4 or 5
+    return rank.VERY_STRONG; // score is 6 or higher
 }
