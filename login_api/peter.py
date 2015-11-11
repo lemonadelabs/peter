@@ -187,7 +187,7 @@ class peter:
 
         token = self.tokenGenerator()
 
-        expiryDate = datetime.datetime.now()+datetime.timedelta(24*3600)
+        expiryDate = datetime.datetime.now()+datetime.timedelta(days=1)
         self.storeRequestToken(token, "resetPwd", username, expiryDate)
 
         tokenURL = request.route_url("peter.loginPage",
